@@ -425,3 +425,122 @@ legitimate_users = legitimate_users.merge(
     on="UserID",
     how="left"
 )
+
+# ==========================================================
+# Préparation de l'ensemble d'apprentissage
+# ==========================================================
+
+# ----------------------------------------------------------
+# 1. Ajout de la variable cible (label)
+# ----------------------------------------------------------
+# 1 = pollueur
+# 0 = utilisateur légitime
+
+polluters_users["label"] = 1
+legitimate_users["label"] = 0
+
+
+# ----------------------------------------------------------
+# 2. Sélection des caractéristiques finales
+# ----------------------------------------------------------
+
+features_columns = [
+    "username_length",
+    "description_length",
+    "account_age_days",
+    "num_followings",
+    "num_followers",
+    "follow_ratio",
+    "tweets_per_day",
+    "url_proportion",
+    "mention_proportion",
+    "avg_time_between_tweets",
+    "max_time_between_tweets",
+    "hashtag_proportion",
+    "following_variance",
+    "label"
+]
+
+polluters_dataset = polluters_users[features_columns]
+legitimate_dataset = legitimate_users[features_columns]
+
+
+# ----------------------------------------------------------
+# 3. Fusion des deux ensembles
+# ----------------------------------------------------------
+
+dataset = pd.concat(
+    [polluters_dataset, legitimate_dataset],
+    ignore_index=True
+)
+
+print("Dataset fusionné :", dataset.shape)
+
+
+# ----------------------------------------------------------
+# 4. Suppression des doublons
+# ----------------------------------------------------------
+
+print("Taille avant suppression des doublons :", dataset.shape)
+
+dataset = dataset.drop_duplicates()
+
+print("Après suppression des doublons :", dataset.shape)
+
+
+# ----------------------------------------------------------
+# 5. Traitement des valeurs manquantes
+# ----------------------------------------------------------
+# Remplacement par la médiane
+
+dataset = dataset.fillna(dataset.median(numeric_only=True))
+
+print("Valeurs manquantes restantes :")
+print(dataset.isnull().sum())
+
+
+# ==========================================================
+# Comparaison avant normalisation
+# ==========================================================
+
+print("\nStatistiques AVANT normalisation :")
+print(dataset.describe())
+
+
+# ----------------------------------------------------------
+# 6. Normalisation des données (Z-score)
+# ----------------------------------------------------------
+
+from sklearn.preprocessing import StandardScaler
+
+X = dataset.drop(columns=["label"])
+y = dataset["label"]
+
+scaler = StandardScaler()
+
+X_scaled = scaler.fit_transform(X)
+
+X_scaled = pd.DataFrame(X_scaled, columns=X.columns)
+
+
+# Reconstruction du dataset final
+dataset_final = pd.concat([X_scaled, y], axis=1)
+
+
+# ==========================================================
+# Comparaison après normalisation
+# ==========================================================
+
+print("\nStatistiques APRÈS normalisation :")
+print(dataset_final.describe())
+
+print("Dimensions finales :", dataset_final.shape)
+
+
+# ----------------------------------------------------------
+# 7. Sauvegarde du dataset final
+# ----------------------------------------------------------
+
+dataset_final.to_csv("twitter_users_training_dataset.csv", index=False)
+
+print("Dataset final sauvegardé : twitter_users_training_dataset.csv")
