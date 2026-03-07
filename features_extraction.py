@@ -412,7 +412,6 @@ polluters_following_var = compute_following_variance(polluters_followings)
 # Calcul pour les utilisateurs légitimes
 legitimate_following_var = compute_following_variance(legitimate_followings)
 
-
 # Fusion avec les profils utilisateurs
 polluters_users = polluters_users.merge(
     polluters_following_var,
@@ -429,19 +428,8 @@ legitimate_users = legitimate_users.merge(
 # ==========================================================
 # Préparation de l'ensemble d'apprentissage
 # ==========================================================
-
 # ----------------------------------------------------------
-# 1. Ajout de la variable cible (label)
-# ----------------------------------------------------------
-# 1 = pollueur
-# 0 = utilisateur légitime
-
-polluters_users["label"] = 1
-legitimate_users["label"] = 0
-
-
-# ----------------------------------------------------------
-# 2. Sélection des caractéristiques finales
+# 1. Sélection des caractéristiques finales
 # ----------------------------------------------------------
 
 features_columns = [
@@ -458,84 +446,64 @@ features_columns = [
     "max_time_between_tweets",
     "hashtag_proportion",
     "following_variance",
-    "label"
 ]
 
 polluters_dataset = polluters_users[features_columns]
 legitimate_dataset = legitimate_users[features_columns]
 
-
 # ----------------------------------------------------------
-# 3. Fusion des deux ensembles
+# 2. Fusion des deux ensembles
 # ----------------------------------------------------------
 
-dataset = pd.concat(
-    [polluters_dataset, legitimate_dataset],
-    ignore_index=True
-)
-
+dataset = pd.concat([polluters_dataset, legitimate_dataset], ignore_index=True)
 print("Dataset fusionné :", dataset.shape)
 
-
 # ----------------------------------------------------------
-# 4. Suppression des doublons
+# 3. Suppression des doublons
 # ----------------------------------------------------------
 
-print("Taille avant suppression des doublons :", dataset.shape)
+duplicates = dataset.duplicated().sum()
+print("Nombre de doublons détectés :", duplicates)
 
 dataset = dataset.drop_duplicates()
-
-print("Après suppression des doublons :", dataset.shape)
-
+print("Taille après suppression des doublons :", dataset.shape)
 
 # ----------------------------------------------------------
-# 5. Traitement des valeurs manquantes
+# 4. Traitement des valeurs manquantes
 # ----------------------------------------------------------
+
+missing_before = dataset.isnull().sum().sum()
+print("Valeurs manquantes avant traitement :", missing_before)
+
 # Remplacement par la médiane
-
 dataset = dataset.fillna(dataset.median(numeric_only=True))
 
-print("Valeurs manquantes restantes :")
-print(dataset.isnull().sum())
+missing_after = dataset.isnull().sum().sum()
+print("Valeurs manquantes après traitement :", missing_after)
 
+# ----------------------------------------------------------
+# 5. Ajout de la variable cible (label)
+# ----------------------------------------------------------
+# 1 = pollueur
+# 0 = utilisateur légitime
 
-# ==========================================================
-# Comparaison avant normalisation
-# ==========================================================
-
-print("\nStatistiques AVANT normalisation :")
-print(dataset.describe())
-
+labels = [1] * len(polluters_dataset) + [0] * len(legitimate_dataset)
+dataset["label"] = labels[:len(dataset)]
 
 # ----------------------------------------------------------
 # 6. Normalisation des données (Z-score)
 # ----------------------------------------------------------
 
-from sklearn.preprocessing import StandardScaler
-
 X = dataset.drop(columns=["label"])
 y = dataset["label"]
 
 scaler = StandardScaler()
-
 X_scaled = scaler.fit_transform(X)
-
-X_scaled = pd.DataFrame(X_scaled, columns=X.columns)
 
 
 # Reconstruction du dataset final
-dataset_final = pd.concat([X_scaled, y], axis=1)
-
-
-# ==========================================================
-# Comparaison après normalisation
-# ==========================================================
-
-print("\nStatistiques APRÈS normalisation :")
-print(dataset_final.describe())
-
-print("Dimensions finales :", dataset_final.shape)
-
+dataset_final = pd.DataFrame(X_scaled, columns=X.columns)
+dataset_final["label"] = y.values
 
 # ----------------------------------------------------------
 # 7. Sauvegarde du dataset final
@@ -543,4 +511,5 @@ print("Dimensions finales :", dataset_final.shape)
 
 dataset_final.to_csv("twitter_users_training_dataset.csv", index=False)
 
-print("Dataset final sauvegardé : twitter_users_training_dataset.csv")
+print("Dataset final :", dataset_final.shape)
+print("Fichier sauvegardé : twitter_users_training_dataset.csv")
